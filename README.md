@@ -10,6 +10,28 @@ Quick Instructions
     $ cd code_to_check
     $ perl get_rep_for_all_families.pl -i data/115699.faa -o data/ -d data/ -v 4.0
 
+More detailed instructions below.
+
+What the code does
+------------------
+
+The algorithm aims to identify the most appropriate representative based on the members of a given (FunFam) alignment.
+
+ * If the FunFam contains one or more CATH domains it identifies the domain with the highest accumulated structural similarity (SSAP) score. 
+ * If the FunFam contains no CATH domains, it should identify the Gene3D sequence with the highest (???) GO score (not yet fully implemented).
+
+What I would like people to focus on
+------------------------------------
+
+ 1. issue 1
+ 1. issue 2
+ 1. issue 3
+
+(Natalie to change)
+
+Detailed Notes
+===============
+
 Getting a local copy of the code
 --------------------------------
 
@@ -58,24 +80,5 @@ Running the script
 
     $ perl get_rep_for_all_families.pl -i data/115699.faa -o data/ -d data/ -v 4.0
 
-What the code does
-------------------
-
-The algorithm aims to identify the most appropriate representative for a given FunFam alignment.
-
-If the FunFam contains one or more CATH domains:
-
-  * identify the CATH domain with the highest accumulated structural similarity (SSAP) score
-
-Otherwise:
-
-  * identify the Gene3D sequence with the highest (???) GO score (not yet fully implemented)
-
-What I would like people to check
----------------------------------
-
- 1. issue 1
- 1. issue 2
- 1. issue 3
 
 
