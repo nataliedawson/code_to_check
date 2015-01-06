@@ -9,15 +9,17 @@
 use strict;
 use warnings;
 
+# IS: Path::Class gives access to File::Basename and File::stat
 use Path::Class;
-
 use File::Basename;
+
+use Bio::SeqIO;
+use Cath::SequenceHeader;
 
 use Cath::SsapList::Matrix;
 use Cath::SsapList::File;
 #use Cath::Ssap;
 use Getopt::Std;
-use File::stat;
 
 #OPTIONS######################
 my %arg;
@@ -30,20 +32,40 @@ die "Pass CATH version with -v\n" unless ( defined $arg{'v'} );
 #die "Pass parent directory path to family GO terms found with -g\n" unless ( defined $arg{'g'} );
 #die "Pass parent directory path to superfamily GO to MD5 mappings with -m\n" unless ( defined $arg{'m'} );
 
+# IS: I would be tempted to deal with sanity checking all the 
+#     input args at the very start of the program before we do 
+#     anything else (chunking similar code together can help 
+#     readability which is always a good thing)
+
+# IS: I've always found it a good idea to stick to the following
+#     program flow:
+#        - setup (sanity check environment, command line arguments, etc)
+#        - input data (from database, flat files, web servers, etc)
+#        - process data
+#        - output data (to log file, web page, database, etc)
+
 #Open the family FASTA file and extract all (if any) structural domains ids#####
 my $family_fasta = file($arg{'i'});
 my $ssap_directory_path = dir( $arg{'d'} );
 
-my $superfamily = basename( $family_fasta->dir );
+# IS: check everything asap, die loudly and quickly on error
+die "Argument error: family FASTA file '$family_fasta' does not exist" 
+	unless -e $family_fasta;
+die "Argument error: SSAP directory '$ssap_directory_path' does not exist" 
+	unless -d $ssap_directory_path;
+
+# IS: naming conventions? (consistency and clarity)
+#     - $superfamily -> $superfamily_id  (is superfamily an object or a string?)
+#     - $family_id   -> $funfam_number   ('family' is quite generic, 'id' sounds unique)
+
+my $superfamily = $family_fasta->dir->basename;
 my $family_id = basename($family_fasta, ".faa"); #extract family id
 
 # check whether rep file already exists
 my $rep_file = file("$ssap_directory_path/$family_id.rep"); # define rep file path
 if ( -e $rep_file ) {
-    my $filestat = stat($rep_file);
-    my $filesize = $filestat->size;
-    print "Filesize = $filesize\n";
-    if ( $filesize > 0 ) {
+    # IS: minor note - Path::Class::File provides access to File::stat
+    if ( $rep_file->stat->size > 0 ) {
         print "Found non-empty rep file. Skipping family...\n";
         exit 0; # exit safely
     }
@@ -57,6 +79,12 @@ info(" Opened FASTA file: $family_fasta\n");
 # get sequence header format
 my $cath_version = $arg{'v'};
 
+# IS: do we know this a valid CATH version?
+#     you can use Cath::Util::cv() to parse the string and 
+#     return a Cath::Version object:
+#
+#     $cath_version = Cath::Util::cv( $arg{'v'} );
+
 # get parent dir of all family GO term files
 #my $go_term_dir = dir( $arg{'g'} );
 
@@ -67,47 +95,51 @@ my $cath_version = $arg{'v'};
 my @domains;
 my @md5s;
 
-while ( <$family_fh> ) {
- 
-    chomp $_;
-    
-    # check cath version and extract CATH structural domains accordingly
-    if ( $cath_version eq '4.0' ) {
-        if ($_ =~ /^>cath/) {
-            my $domain = substr $_, 12, 7; # extract domain from header
-            push (@domains, $domain);      # push onto array
-        }
-        elsif ( $_ =~ /^>\w{32}/ ) {
-            my $md5 = substr $_, 1, 32;    # extract MD5 from header
-            push( @md5s, $md5 );           # push onto array
-        }
-    }
-    else {
-        if ($_ =~ /^>domain/) {
-            my $domain = substr $_, 8, 7; # extract domain from header
-            push (@domains, $domain);     # push onto array
-        }
-        elsif ( $_ =~ /^>\w{32}/ ) {
-            my $md5 = substr $_, 1, 32;    # extract MD5 from header
-            push( @md5s, $md5 );           # push onto array
-        }
-    }
+# IS: I would consider always using Bio::SeqIO to parse FASTA files.
+#     BioPerl is a big dependency, but it's already installed in the
+#     shared Perl.
 
+# IS: I would consider using Cath::SequenceHeader to parse
+#     the header lines of CATH-based FASTA files (saves you
+#     having to worry about the formatting between versions
+#     and does lots of sanity checking for you)
+
+my $family_io = Bio::SeqIO->new( -file => "$family_fasta", -format => "FASTA" );
+while ( $seq = $io->next_seq ) {
+	my $cath_header = Cath::SequenceHeader->new_from_string( $seq->id );
+	if ( $cath_header->id_type eq 'biomap' ) {
+		push @md5s, $cath_header->id;
+	}
+	else {
+		push @domains, $cath_header->id;
+	}
 }
 
 #print "\@domain ids: @domains\n";
 
+my $out_path = dir( $arg{'o'} );
+
 # create output directory path to hold reps
-my ( $out_path ) = create_output_directory_path( $arg{'o'} );
+# IS: you can use Path::Class::Dir->mkpath to create required directories
+if ( ! -e $out_path ) {
+	info( "output path '$out_path' does not exist, trying to create..." );
+	$out_path->mkpath;
+}
 
 # count the number of domains/md5s found in the functional family
+
+# IS: naming? $ssap_count_all -> $domain_count_all
 my $ssap_count_all = scalar @domains;
 my $md5_count_all = scalar @md5s;
 
 info(" Found $ssap_count_all CATH structural domains\n");
 info(" Found $md5_count_all MD5 sequences\n");
 
-
+# IS: the following step is trying to do the same thing by different methods
+#     - essentially score a list of ids according to their "representative-ness".
+#     might be more clear / flexible if the run_ssap_method and run_go_method
+#     both calculated this, returned the list of ids as data, then allow the
+#     script to write the .rep files in the same way.
 
 # choose which method of assignment to use based upon the number of CATH domains
 if ( $ssap_count_all == 1) {
@@ -135,6 +167,10 @@ if ( $ssap_count_all == 1) {
 
 ####################SUBROUTINES#################################################
 
+# IS: Nicely done. You might also be interested in:
+#     Pod::Usage - generates the usage message from the inline documentation 
+#        (helps to keep the usage message up to date with any changes)
+#     MooseX::Getopt - uses Moose to parse / coerce args into data types
 
 sub help {
 	print <<"END_MESSAGE";
@@ -181,34 +217,29 @@ END_MESSAGE
 
 ################################################################################
 
-sub create_output_directory_path {
-    
-    my ( $out_path ) = dir( shift ); # will this syntax work?!
-     
-    # Create the output directory path if it does not already exist
-    my $out_dir_parent_path = $out_path->parent;
-    
-    if ( ! -e $out_dir_parent_path ) {
-        info(" $out_dir_parent_path does not exist, creating folder...\n");
-        mkdir( $out_dir_parent_path ) or die "Cannot create $out_dir_parent_path";
-    }
-    else {
-        info(" Cannot create folder $out_dir_parent_path, it already exists...\n");
-    }
-    
-    if ( ! -e $out_path )
-    {
-        # change to get ../ folder so can mkdir on that first
-        info(" $out_path does not exist, creating folder...\n");
-        mkdir( $out_path ) or die "Cannot create $out_path";
-    }
-    else {
-        info(" Cannot create folder for $out_path, it already exists...\n");
-    }
-    return( $out_path );
-} 
+# IS: useful to have a summary of each function (ideally in POD)
 
-################################################################################
+=head1 METHODS
+
+=head2 run_ssap_method( $ssap_dir, $out_dir, $funfam_number, $cath_version, $domain_ids )
+
+Scores a list of domains by accumulated SSAP score
+
+=over 8
+
+=item Ensure all the SSAPs are present
+
+=item Stores SSAP list in $out_dir/$funfam_number/
+
+=item Calculate accumulated SSAP score for each domain
+
+
+=back
+
+=item Returns list of domain IDs ordered by decreasing accumulated ssap score 
+
+=cut
+
 
 sub run_ssap_method {
  
@@ -218,7 +249,13 @@ sub run_ssap_method {
     info( " Changing directory to $ssap_directory_path" ); # change to ssap dir
     chdir "$ssap_directory_path"
     	or die "Error: failed to chdir to '$ssap_directory_path': $!";
-    	
+    
+    # IS: if $family_id is actually the funfam number (rather than 
+    #     the superfamily_id + funfam_number) then it looks like there could be 
+    #     a danger that funfams from different superfamilies could get stored
+    #     in the same directory (problem if two funfams in different superfamilies
+    #     had the same funfam_number)
+    
     my $rep_file = file("$out_path/$family_id.rep"); # define rep file path
     
     # create file to store SSAP output
