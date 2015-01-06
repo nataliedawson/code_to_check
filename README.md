@@ -3,6 +3,13 @@ OrengoGroup Code Review 1
 
 This repo provides access to a Perl script that has been submitted for review within the Orengo group. Instructions for testing on your local system are given below. 
 
+Quick Instructions
+------------------
+
+    $ git clone https://github.com/nataliedawson/code_to_check.git
+    $ cd code_to_check
+    $ perl get_rep_for_all_families.pl -i data/115699.faa -o data/ -d data/ -v 4.0
+
 Getting a local copy of the code
 --------------------------------
 
