@@ -23,11 +23,8 @@ The algorithm aims to identify the most appropriate representative based on the 
 What I would like people to focus on
 ------------------------------------
 
- 1. issue 1
- 1. issue 2
- 1. issue 3
+ 1. Making the script less memory intensive so that it no longer crashes
 
-(Natalie to change)
 
 Detailed Notes
 ===============
