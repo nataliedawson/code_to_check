@@ -6,6 +6,12 @@
 
 # note that 'family' always means 'functional family'
 
+# PA: I couldn't run the program successfully, due to a problem with the SAP score module.
+# The error I got was:
+# "Command 'SSAP' not found in /opt/local/perls/build-trunk/bin, /usr/lib64/qt-3.3/bin, 
+# /usr/lib64/mpich/bin, /usr/lib64/ccache, /usr/local/bin, /usr/bin, /usr/local/sbin, 
+# /usr/sbin at /usr/local/svn/trunk/lib/perl5/Cath/Role/Cmd.pm line 37."
+
 use strict;
 use warnings;
 
