@@ -31,8 +31,8 @@ die "Pass CATH version with -v\n" unless ( defined $arg{'v'} );
 #die "Pass parent directory path to superfamily GO to MD5 mappings with -m\n" unless ( defined $arg{'m'} );
 
 #Open the family FASTA file and extract all (if any) structural domains ids#####
-my $family_fasta = file($arg{'i'});
-my $ssap_directory_path = dir( $arg{'d'} );
+my $family_fasta = file($arg{'i'})->absolute;
+my $ssap_directory_path = dir( $arg{'d'} )->absolute;
 
 my $superfamily = basename( $family_fasta->dir );
 my $family_id = basename($family_fasta, ".faa"); #extract family id
@@ -98,7 +98,11 @@ while ( <$family_fh> ) {
 #print "\@domain ids: @domains\n";
 
 # create output directory path to hold reps
-my ( $out_path ) = create_output_directory_path( $arg{'o'} );
+my ( $out_path ) = dir( $arg{'o'} )->absolute;
+if ( !-e $out_path ) {
+	info( "output path '$out_path' does not exist, trying to create..." );
+	$out_path->mkpath;
+}
 
 # count the number of domains/md5s found in the functional family
 my $ssap_count_all = scalar @domains;
