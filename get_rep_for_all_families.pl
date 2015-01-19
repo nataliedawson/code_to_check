@@ -235,7 +235,10 @@ sub run_ssap_method {
     my $ssap_out_file = file("$out_path/$family_id.ssap");
 #    my $ssap_out_fh = $ssap_out_file->openr or die "Cannot open $ssap_out_file for reading: $!";
 
-    my $ssaplist = ensure_complete_ssap_file( "$ssap_out_file", $domains, $cath_version );
+    # create path to alignment tar archive
+    my $alignment_archive = file( "$out_path/$family_id.alignment.tgz" );
+
+    my $ssaplist = ensure_complete_ssap_file( $ssap_out_file, $domains, $cath_version, $alignment_archive );
     
     #get all ssap entries in ssaplist
     my @ssaps = $ssaplist->all_ssaps;
@@ -286,42 +289,66 @@ sub run_ssap_method {
 ################################################################################
 
 sub ensure_complete_ssap_file {
- my ($ssap_file, $domains, $cath_version) = @_;
+    my ($ssap_file, $domains, $cath_version, $alignment_archive ) = @_;
+    
+    my $ssaplist;
+    if ( -e $ssap_file ) { # check the SSAP matrix in a file
+        $ssaplist = Cath::SsapList::File->new( version => $cath_version, file => $ssap_file ); 
+    }
+    else { # check SSAP matrix of all family domains
+         $ssaplist = Cath::SsapList::Matrix->new( domain_ids => $domains, version => $cath_version );
+    }
+    
+    info( " Checking SSAP matrix for completeness of file $ssap_file...\n");
+    
 
- my $ssaplist;
- if ( -e $ssap_file ) { # check the SSAP matrix in a file
-  $ssaplist = Cath::SsapList::File->new( version => $cath_version, file => $ssap_file ); 
- }
- else { # check SSAP matrix of all family domains
-  $ssaplist = Cath::SsapList::Matrix->new( domain_ids => $domains, version => $cath_version );
- }
+    my $ssap_fh = $ssap_file->opena();
+    
+    #my $count_ssaps_before = $ssaplist->count_ssaps;
+    #$ssaplist->check_matrix( domains => $domains, on_error => 'RUN_SSAPS' );
+    $ssaplist->check_matrix( 
+	domains => $domains,
+	on_error => sub {
+               my $self = shift;
+               my $missing_ssaps = shift;
+               for my $ssap ( @$missing_ssaps ) {
+                   # run the SSAP
+                   #print "Appending alignment to archive: $alignment_archive...\n";
+                   $ssap->run( append_alignment_to_archive => $alignment_archive );
+                   
+                   #print "missing ssap entry: $ssap\n";
+                   # append SSAP score to file
+                   $ssap_fh->print( $ssap->to_string, "\n" );
+                   
+                   # add this SSAP to SsapList object
+                   $self->add_ssap( $ssap );
+               }
+           }
+        );
 
- info( " Checking SSAP matrix for completeness of file $ssap_file...\n");
-
- my $count_ssaps_before = $ssaplist->count_ssaps;
- $ssaplist->check_matrix( domains => $domains, on_error => 'RUN_SSAPS' );
-# $ssaplist->check_matrix( domains => $domains );
- my $count_ssaps_after = $ssaplist->count_ssaps;
- 
- info( " $count_ssaps_before SSAPs in original. Should be $count_ssaps_after.\n");
- 
- if ( ! -e $ssap_file || $count_ssaps_before != $count_ssaps_after ){
-  info( "Writing SSAP file: $ssap_file" );
-#  my $ssap_fh = $ssap_file->openw or die "Cannot open $ssap_file for writing: $!";
-#  $ssaplist->run_ssaps;
-  $ssaplist->to_file( $ssap_file );
- }
-
- return $ssaplist;
+    $ssap_fh->close;
+        
+   # my $count_ssaps_after = $ssaplist->count_ssaps;
+    
+   # info( " $count_ssaps_before SSAPs in original. Should be $count_ssaps_after.\n");
+    
+   # if ( ! -e $ssap_file || $count_ssaps_before != $count_ssaps_after ) {
+   #     info( "Writing SSAP file: $ssap_file" );
+        #my $ssap_fh = $ssap_file->openw or die "Cannot open $ssap_file for writing: $!";
+        #$ssaplist->run_ssaps;
+   #     $ssaplist->to_file( $ssap_file );
+   # }
+    
+    return $ssaplist;
 }
 
 
 ################################################################################
 
 sub info {
-	my $msg = "@_";
-	chomp($msg);
-	print "[$$] $msg\n";
+    my $msg = "@_";
+    chomp($msg);
+    print "[$$] $msg\n";
 }
 
 ################################################################################
