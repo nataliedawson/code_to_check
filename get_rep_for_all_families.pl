@@ -302,6 +302,9 @@ sub run_ssap_method {
     }
 }
 
+# AMG: I can't see how SSAP runs here. Is it in a basic pair-wise manner, or in a multiple superposition?
+# AMG: In case it's something like a multiple superposition, switching to a serialised pairwise ssap runs would be slower but less memmory consuming?
+
 ################################################################################
 sub ensure_complete_ssap_file {
     my ($ssap_file, $domains, $cath_version, $alignment_archive ) = @_;
