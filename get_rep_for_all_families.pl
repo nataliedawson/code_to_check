@@ -6,6 +6,22 @@
 
 # note that 'family' always means 'functional family'
 
+# NLD: Script seems to run fine but bad exit status errors generated for some SSAP pairs
+#ERROR: bad exit status for command 'SSAP 1ch9A00 1mlqA00':  (pwd: /cath/people2/ucbtnld/export/natalie/cath/v4_0_0/SEED+CATH_funfam_nofrag80/1.10.490.10/5179)
+#STDOUT:
+#
+#STDERR:
+
+# at /cath/homes2/ucbtnld/orengosvn/cpan/trunk/Cath/lib//Cath/Role/Cmd.pm line 43.
+#	Class::MOP::Class:::around('CODE(0x3262390)', 'Cath::Cmd::Ssap=HASH(0x1152f0308)', '1ch9A00', '1mlqA00') called at /opt/local/perls/build-trunk/lib/site_perl/5.12.2/x86_64-linux/Class/MOP/Method/Wrapped.pm line 158
+#	Class::MOP::Method::Wrapped::__ANON__('Cath::Cmd::Ssap=HASH(0x1152f0308)', '1ch9A00', '1mlqA00') called at /opt/local/perls/build-trunk/lib/site_perl/5.12.2/x86_64-linux/Class/MOP/Method/Wrapped.pm line 87
+#	Cath::Cmd::Ssap::run('Cath::Cmd::Ssap=HASH(0x1152f0308)', '1ch9A00', '1mlqA00') called at /cath/homes2/ucbtnld/orengosvn/cpan/trunk/Cath/lib//Cath/Ssap.pm line 273
+#	Cath::Ssap::run(undef, 'append_alignment_to_archive', 'Path::Class::File=HASH(0x54c2c78)') called at /cath/people2/ucbtnld/code_to_check/get_rep_for_all_families.pl line 327
+#	main::__ANON__('Cath::SsapList::File=HASH(0x54c30f8)', 'ARRAY(0x50e1a18)') called at /cath/homes2/ucbtnld/orengosvn/cpan/trunk/Cath/lib//Cath/SsapList.pm line 576
+#	Cath::SsapList::check_matrix(undef, 'domains', 'ARRAY(0x537b938)', 'on_error', 'CODE(0x54c2d50)') called at /cath/people2/ucbtnld/code_to_check/get_rep_for_all_families.pl line 337
+#	main::ensure_complete_ssap_file('Path::Class::File=HASH(0x54edc18)', 'ARRAY(0x537b938)', 4.0, 'Path::Class::File=HASH(0x54c2c78)') called at /cath/people2/ucbtnld/code_to_check/get_rep_for_all_families.pl line 241
+#	main::run_ssap_method('Path::Class::Dir=HASH(0xc50d70)', 'Path::Class::Dir=HASH(0x54edaf8)', 5179, 4.0, 'ARRAY(0x537b938)') called at /cath/people2/ucbtnld/code_to_check/get_rep_for_all_families.pl line 140
+
 # PA: I couldn't run the program successfully, due to a problem with the SAP score module.
 # The error I got was:
 # "Command 'SSAP' not found in /opt/local/perls/build-trunk/bin, /usr/lib64/qt-3.3/bin, 
@@ -14,16 +30,16 @@
 
 use strict;
 use warnings;
-
+use FindBin;
 use Path::Class;
-
-use File::Basename;
-
-use Cath::SsapList::Matrix;
 use Cath::SsapList::File;
-#use Cath::Ssap;
+use File::Basename;
+use Cath::SsapList::Matrix;
 use Getopt::Std;
 use File::stat;
+use Carp qw/ confess /;
+use Data::Dumper;
+
 
 #OPTIONS######################
 my %arg;
@@ -287,17 +303,27 @@ sub run_ssap_method {
 }
 
 ################################################################################
-
 sub ensure_complete_ssap_file {
     my ($ssap_file, $domains, $cath_version, $alignment_archive ) = @_;
     
     my $ssaplist;
     if ( -e $ssap_file ) { # check the SSAP matrix in a file
-        $ssaplist = Cath::SsapList::File->new( version => $cath_version, file => $ssap_file ); 
+        
+        my %opts = (
+	    version => "$cath_version", file => "$ssap_file",
+        );
+        #print "OPTS: " . Dumper( \%opts );
+        $ssaplist = Cath::SsapList::File->new( %opts ); 
+        #print "SSAPLIST: " . Dumper( $ssaplist );
     }
     else { # check SSAP matrix of all family domains
          $ssaplist = Cath::SsapList::Matrix->new( domain_ids => $domains, version => $cath_version );
     }
+    
+    # check that $ssaplist is a Cath::SsapList object
+    confess "Error: expected Cath::SsapList object, not $ssaplist" 
+        unless $ssaplist->isa( 'Cath::SsapList' );
+    
     
     info( " Checking SSAP matrix for completeness of file $ssap_file...\n");
     
